@@ -1,0 +1,7 @@
+flet>=0.85
+requests
+urllib3
+# 打包用（macOS 走 pyinstaller build.spec，Win 走 flet pack）
+pyinstaller>=6.0; sys_platform == "darwin"
+# Dock 图标激活策略需要（macOS only）
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"

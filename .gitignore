@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+*.log
+*.tmp
+._*
+build/
+dist/
+*.spec.bak
+校园养成教育助手.spec
+
+# Runtime credentials
+session.txt
+*.session
+playback_token.txt
+
+# Local-only utilities not included in the open-source release
+playback_api.py
+playback_download.py
+playback_token.py
+
+# Bundled third-party
+mitmproxy.app/
+
+# Flet build cache
+.flet/
+
+# Runtime outputs
+课堂回放下载/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
