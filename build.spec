@@ -20,6 +20,9 @@ _qlit_flet_bin_dir = os.environ.get("QLIT_FLET_BIN_DIR")
 if _qlit_flet_bin_dir:
     _flet_hook_config.temp_bin_dir = _qlit_flet_bin_dir
 
+QLIT_APP_VERSION = os.environ.get("QLIT_APP_VERSION", "1.0.0")
+QLIT_APP_BUILD = os.environ.get("QLIT_APP_BUILD", "1")
+
 _orig_sign_binary = _osx.sign_binary
 
 
@@ -84,10 +87,12 @@ app = BUNDLE(
     coll,
     name="QLIT养成教育助手.app",
     icon="assets/app.icns",
-    bundle_identifier="com.qlit.campusauth",
+    bundle_identifier="com.kevinxu.qlit.yangchenghelper",
     info_plist={
         "CFBundleName": "QLIT养成教育助手",
         "CFBundleDisplayName": "QLIT养成教育助手",
+        "CFBundleShortVersionString": QLIT_APP_VERSION,
+        "CFBundleVersion": QLIT_APP_BUILD,
         "NSHighResolutionCapable": True,
         # 外层宿主 App 从 Dock 隐藏（Flet.app 显式设 LSUIElement=false 来进 Dock）
         "LSUIElement": True,

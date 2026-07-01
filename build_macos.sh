@@ -12,6 +12,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="QLIT养成教育助手"
+APP_VERSION="${QLIT_APP_VERSION:-1.0.0}"
+APP_BUILD="${QLIT_APP_BUILD:-$(date +%Y%m%d%H%M%S)}"
 DIST_APP="dist/${APP_NAME}.app"
 DIST_ZIP="dist/${APP_NAME}.zip"
 MITM_CASKROOM="/opt/homebrew/Caskroom/mitmproxy"
@@ -64,6 +66,32 @@ log_cmd() {
   return "$status"
 }
 
+resolve_actool() {
+  local cand=""
+  if [ -n "${DEVELOPER_DIR:-}" ] && [ -x "${DEVELOPER_DIR}/usr/bin/actool" ]; then
+    echo "${DEVELOPER_DIR}/usr/bin/actool"
+    return 0
+  fi
+  if command -v xcrun >/dev/null 2>&1; then
+    cand="$(xcrun -f actool 2>/dev/null || true)"
+    if [ -n "$cand" ] && [ -x "$cand" ]; then
+      echo "$cand"
+      return 0
+    fi
+  fi
+  for cand in \
+    "/Applications/Xcode.app/Contents/Developer/usr/bin/actool" \
+    /Volumes/*/Xcode.app/Contents/Developer/usr/bin/actool \
+    /Volumes/*/*/Xcode.app/Contents/Developer/usr/bin/actool
+  do
+    if [ -x "$cand" ]; then
+      echo "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
 codesign_item() {
   local path="$1"
   [ -e "$path" ] || return 0
@@ -107,50 +135,47 @@ prepare_flet_runtime_bundle() {
   fi
 
   FLET_BUILD_ROOT="$(mktemp -d)"
-  local app_bundle_name="${APP_NAME}.app"
-  local app_executable_name="$APP_NAME"
+  local app_bundle_name="Flet.app"
   local flet_app="$FLET_BUILD_ROOT/$app_bundle_name"
   local flet_xcassets="$FLET_BUILD_ROOT/AppIcon.xcassets"
   local flet_appiconset="$flet_xcassets/AppIcon.appiconset"
   local flet_build="$FLET_BUILD_ROOT/build"
   local icon_src_png="assets/app-icon.png"
-  local original_exec="Flet"
-
-  ditto "$FLET_SRC_APP" "$FLET_BUILD_ROOT/Flet.app"
-  mv "$FLET_BUILD_ROOT/Flet.app" "$flet_app"
-
-  if [ -f "$flet_app/Contents/MacOS/$original_exec" ]; then
-    mv "$flet_app/Contents/MacOS/$original_exec" "$flet_app/Contents/MacOS/$app_executable_name"
-  fi
+  local prebuilt_icon_icns="assets/macos-runtime/Flet-AppIcon.icns"
+  local prebuilt_assets_car="assets/macos-runtime/Flet-Assets.car"
+  ditto "$FLET_SRC_APP" "$flet_app"
 
   plutil -replace CFBundleIconFile -string AppIcon "$flet_app/Contents/Info.plist" 2>/dev/null || true
   plutil -replace CFBundleIconName -string AppIcon "$flet_app/Contents/Info.plist" 2>/dev/null || true
   plutil -replace LSUIElement -bool NO "$flet_app/Contents/Info.plist" 2>/dev/null || true
   plutil -replace CFBundleName -string "$APP_NAME" "$flet_app/Contents/Info.plist" 2>/dev/null || true
   plutil -replace CFBundleDisplayName -string "$APP_NAME" "$flet_app/Contents/Info.plist" 2>/dev/null || true
-  plutil -replace CFBundleExecutable -string "$app_executable_name" "$flet_app/Contents/Info.plist" 2>/dev/null || true
-  plutil -replace CFBundleIdentifier -string "com.qlit.campusauth.flet" "$flet_app/Contents/Info.plist" 2>/dev/null || true
+  plutil -replace CFBundleIdentifier -string "com.kevinxu.qlit.yangchenghelper.runtime" "$flet_app/Contents/Info.plist" 2>/dev/null || true
 
   if [ -f "$icon_src_png" ]; then
-    mkdir -p "$flet_appiconset" "$flet_build"
-    make_icon() {
-      local size="$1"
-      local filename="$2"
-      sips -s format png -z "$size" "$size" "$icon_src_png" --out "$flet_appiconset/$filename" >/dev/null
-    }
+    if [ -f "$prebuilt_icon_icns" ] && [ -f "$prebuilt_assets_car" ]; then
+      ditto "$prebuilt_icon_icns" "$flet_app/Contents/Resources/AppIcon.icns"
+      ditto "$prebuilt_assets_car" "$flet_app/Contents/Resources/Assets.car"
+    else
+      mkdir -p "$flet_appiconset" "$flet_build"
+      make_icon() {
+        local size="$1"
+        local filename="$2"
+        sips -s format png -z "$size" "$size" "$icon_src_png" --out "$flet_appiconset/$filename" >/dev/null
+      }
 
-    make_icon 16   "icon_16x16.png"
-    make_icon 32   "icon_16x16@2x.png"
-    make_icon 32   "icon_32x32.png"
-    make_icon 64   "icon_32x32@2x.png"
-    make_icon 128  "icon_128x128.png"
-    make_icon 256  "icon_128x128@2x.png"
-    make_icon 256  "icon_256x256.png"
-    make_icon 512  "icon_256x256@2x.png"
-    make_icon 512  "icon_512x512.png"
-    make_icon 1024 "icon_512x512@2x.png"
+      make_icon 16   "icon_16x16.png"
+      make_icon 32   "icon_16x16@2x.png"
+      make_icon 32   "icon_32x32.png"
+      make_icon 64   "icon_32x32@2x.png"
+      make_icon 128  "icon_128x128.png"
+      make_icon 256  "icon_128x128@2x.png"
+      make_icon 256  "icon_256x256.png"
+      make_icon 512  "icon_256x256@2x.png"
+      make_icon 512  "icon_512x512.png"
+      make_icon 1024 "icon_512x512@2x.png"
 
-    cat > "$flet_appiconset/Contents.json" <<'JSON'
+      cat > "$flet_appiconset/Contents.json" <<'JSON'
 {
   "images" : [
     { "idiom" : "mac", "size" : "16x16",   "scale" : "1x", "filename" : "icon_16x16.png" },
@@ -171,20 +196,28 @@ prepare_flet_runtime_bundle() {
 }
 JSON
 
-    /Applications/Xcode.app/Contents/Developer/usr/bin/actool \
-      --compile "$flet_build" \
-      --platform macosx \
-      --target-device mac \
-      --minimum-deployment-target 11.0 \
-      --app-icon AppIcon \
-      --output-partial-info-plist "$flet_build/partial-info.plist" \
-      "$flet_xcassets" >/dev/null
+      local actool_bin=""
+      actool_bin="$(resolve_actool || true)"
+      if [ -n "$actool_bin" ]; then
+        "$actool_bin" \
+          --compile "$flet_build" \
+          --platform macosx \
+          --target-device mac \
+          --minimum-deployment-target 11.0 \
+          --app-icon AppIcon \
+          --output-partial-info-plist "$flet_build/partial-info.plist" \
+          "$flet_xcassets" >/dev/null
+      else
+        echo "⚠ 未找到 actool，退回 iconutil 生成 AppIcon.icns"
+        /usr/bin/iconutil -c icns "$flet_appiconset" -o "$flet_build/AppIcon.icns"
+      fi
 
-    if [ -f "$flet_build/AppIcon.icns" ]; then
-      ditto "$flet_build/AppIcon.icns" "$flet_app/Contents/Resources/AppIcon.icns"
-    fi
-    if [ -f "$flet_build/Assets.car" ]; then
-      ditto "$flet_build/Assets.car" "$flet_app/Contents/Resources/Assets.car"
+      if [ -f "$flet_build/AppIcon.icns" ]; then
+        ditto "$flet_build/AppIcon.icns" "$flet_app/Contents/Resources/AppIcon.icns"
+      fi
+      if [ -f "$flet_build/Assets.car" ]; then
+        ditto "$flet_build/Assets.car" "$flet_app/Contents/Resources/Assets.car"
+      fi
     fi
   fi
 
@@ -224,7 +257,10 @@ echo "==> PyInstaller"
 rm -rf build dist 2>/dev/null || true
 echo "==> 准备 Flet 运行时归档"
 prepare_flet_runtime_bundle
-QLIT_FLET_BIN_DIR="$FLET_BUILD_ROOT" pyinstaller build.spec --noconfirm
+QLIT_FLET_BIN_DIR="$FLET_BUILD_ROOT" \
+QLIT_APP_VERSION="$APP_VERSION" \
+QLIT_APP_BUILD="$APP_BUILD" \
+pyinstaller build.spec --noconfirm
 if [ ! -d "$DIST_APP" ]; then
   echo "✗ 打包失败"
   exit 1
@@ -274,10 +310,13 @@ fi
 
 echo "==> 生成 zip"
 rm -f "$DIST_ZIP"
+/usr/bin/touch "$DIST_APP"
+/usr/bin/touch "$DIST_APP/Contents/Info.plist"
 ditto -c -k --keepParent "$DIST_APP" "$DIST_ZIP"
 
 echo ""
 echo "✓ 完成：$(pwd)/$DIST_APP"
+echo "  版本：$APP_VERSION ($APP_BUILD)"
 du -sh "$DIST_APP"
 du -sh "$DIST_ZIP"
 echo ""

@@ -22,6 +22,7 @@ import socket
 import subprocess
 import sys
 import tarfile
+import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -116,7 +117,12 @@ def _extract_bundled_flet_view(archive: Path) -> Path | None:
         cache_root = Path.home() / "Library" / "Application Support" / APP_NAME / "flet-runtime"
         marker_path = cache_root / ".source"
         app_path = _find_app_bundle(cache_root)
-        if app_path.is_dir() and marker_path.exists() and marker_path.read_text(encoding="utf-8") == marker:
+        if (
+            app_path is not None
+            and app_path.is_dir()
+            and marker_path.exists()
+            and marker_path.read_text(encoding="utf-8") == marker
+        ):
             _remove_macos_metadata_files(cache_root)
             if _cached_flet_view_is_usable(cache_root):
                 return cache_root
@@ -139,24 +145,63 @@ def _extract_bundled_flet_view(archive: Path) -> Path | None:
         return None
 
 
-def configure_embedded_flet_view_path() -> None:
-    """打包后强制使用包内 Flet.app，而不是 ~/.flet/client 缓存。"""
-    if sys.platform != "darwin" or not getattr(sys, "frozen", False):
-        return
+def _patch_flet_desktop_runtime(runtime_dir: Path) -> None:
+    app_path = _find_app_bundle(runtime_dir)
+    if app_path is None:
+        raise FileNotFoundError(f"找不到内置 Flet runtime: {runtime_dir}")
+
+    import flet_desktop
+
+    def _launch_payload(page_url: str, assets_dir: str | None, hidden: bool):
+        pid_file = str(Path(tempfile.gettempdir()).joinpath(os.urandom(10).hex()))
+        args = ["open", str(app_path), "-n", "-W", "--args", page_url, pid_file]
+        flet_env = {**os.environ}
+        if assets_dir:
+            args.append(assets_dir)
+        if hidden:
+            flet_env["FLET_HIDE_WINDOW_ON_START"] = "true"
+        return args, flet_env, pid_file
+
+    def _open_flet_view(page_url: str, assets_dir: str | None, hidden: bool):
+        args, flet_env, pid_file = _launch_payload(page_url, assets_dir, hidden)
+        return subprocess.Popen(args, env=flet_env), pid_file
+
+    async def _open_flet_view_async(
+        page_url: str, assets_dir: str | None, hidden: bool
+    ):
+        args, flet_env, pid_file = _launch_payload(page_url, assets_dir, hidden)
+        proc = await asyncio.create_subprocess_exec(args[0], *args[1:], env=flet_env)
+        return proc, pid_file
+
+    flet_desktop.ensure_client_cached = lambda: runtime_dir
+    flet_desktop.open_flet_view = _open_flet_view
+    flet_desktop.open_flet_view_async = _open_flet_view_async
+
+
+def configure_embedded_flet_view_path() -> Path | None:
+    """优先锁定到包内 Flet runtime，避免回退到 ~/.flet/client 默认缓存。"""
+    if sys.platform != "darwin":
+        return None
     try:
+        runtime_dir: Path | None = None
         for candidate in _embedded_flet_view_candidates():
             if _cached_flet_view_is_usable(candidate):
-                os.environ["FLET_VIEW_PATH"] = str(candidate)
-                return
-        for candidate in _embedded_flet_view_candidates():
-            archive = candidate / "flet-macos.tar.gz"
-            if archive.is_file():
-                runtime_dir = _extract_bundled_flet_view(archive)
-                if runtime_dir is not None:
-                    os.environ["FLET_VIEW_PATH"] = str(runtime_dir)
-                    return
+                runtime_dir = candidate
+                break
+        if runtime_dir is None:
+            for candidate in _embedded_flet_view_candidates():
+                archive = candidate / "flet-macos.tar.gz"
+                if archive.is_file():
+                    runtime_dir = _extract_bundled_flet_view(archive)
+                    if runtime_dir is not None:
+                        break
+        if runtime_dir is None:
+            return None
+        os.environ["FLET_VIEW_PATH"] = str(runtime_dir)
+        _patch_flet_desktop_runtime(runtime_dir)
+        return runtime_dir
     except Exception:
-        pass
+        return None
 
 
 def _flet_run_kwargs() -> dict:
@@ -2012,4 +2057,7 @@ def main(page: ft.Page) -> None:
 
 
 if __name__ == "__main__":
+    # 必须在 ft.run() 之前设置；Flet 会在 run() 内部先启动桌面 runtime，
+    # 放到 main(page) 里已经来不及，Dock 会继续命中 ~/.flet/client 里的默认 Flet.app。
+    configure_embedded_flet_view_path()
     ft.run(main, **_flet_run_kwargs())

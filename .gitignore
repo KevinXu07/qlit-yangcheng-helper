@@ -38,6 +38,9 @@ mitmproxy.app/
 # OS
 .DS_Store
 Thumbs.db
+.icon*/
+.runtime_iconset*/
+.old_runtime_iconset.iconset/
 
 # Editor
 .idea/
