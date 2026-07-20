@@ -26,7 +26,6 @@ qlit-flet/
 ├── yangcheng_auto.py       # 养成教育鉴权、AI 生成、提交逻辑
 ├── session_utils.py        # session 探活
 ├── assets/                 # 图标、字体等资源
-├── docs/                   # 架构与开源说明
 ├── build.spec              # macOS PyInstaller 配置
 ├── build_macos.sh          # macOS 打包脚本
 ├── build_windows.bat       # Windows 打包脚本
