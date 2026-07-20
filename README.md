@@ -86,25 +86,7 @@ python3 yangcheng_auto.py 2026-06-01 2026-06-30
 说明：
 
 - 本地需要安装 mitmproxy，脚本会从 Homebrew Cask 目录复制 `mitmproxy.app`
-- `mitmproxy.app`、`build/`、`dist/` 都不会进入 Git 仓库
 - `build.spec` 使用 PyInstaller 的 onedir + bundle 方案，避免内嵌 `.app` 签名问题
-
-### Windows
-
-```bat
-build_windows.bat
-```
-
-## 安全与隐私
-
-- 抓取凭据时会临时启用本地代理，并信任 mitmproxy CA 证书
-- session、AI Key、导出的设置文件都属于敏感信息，不应该提交到 Git
-- 发布前建议检查仓库历史里是否混入过 `session.txt`、HAR、截图、打包产物
-
-## 文档
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [docs/OPEN_SOURCE_CHECKLIST.md](docs/OPEN_SOURCE_CHECKLIST.md)
 
 ## License
 
