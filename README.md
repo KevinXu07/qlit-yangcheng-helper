@@ -2,8 +2,6 @@
 
 一个基于 Flet 的桌面工具，用于抓取 `pass.qlit.edu.cn` 登录后的 `JSESSIONID`，并批量填写“养成教育”记录。
 
-当前准备公开的仓库范围只包含“QLIT养成教育助手”本身，不包含课堂回放相关脚本。
-
 ## 项目状态
 
 这是一个个人研究性质的桌面工具，不是学校官方工具，也不是通用校园平台 SDK。
@@ -12,7 +10,7 @@
 
 ## 主要功能
 
-- Flet GUI，支持 macOS 和 Windows
+- Flet GUI，本版本只支持macos
 - 用 mitmproxy 抓取微信 OAuth 登录后的 student 域 `JSESSIONID`
 - 自动检测 session 是否过期
 - 按日期范围补填养成教育记录
